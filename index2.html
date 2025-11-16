@@ -58,11 +58,9 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             z-index: 10; /* Ensure map is clickable */
         }
-        /* Fix for Leaflet tiles appearing broken */
         .leaflet-container {
             background-color: #0d1a2e;
         }
-        /* Custom map popup styles */
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
             background-color: #1e293b; /* bg-slate-800 */
             color: #e2e8f0; /* text-slate-200 */
@@ -75,6 +73,52 @@
         .leaflet-popup-close-button {
             color: #e2e8f0 !important;
         }
+
+        /* --- Custom Slider Styles --- */
+        input[type=range] {
+            /* --- CSS FIX: Added 'appearance' --- */
+            appearance: none; 
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        /* Thumb */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            margin-top: -7px; /* Center thumb on track */
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+        }
+        /* Track */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #1e293b;
+            border-radius: 3px;
+            border: 1px solid #334155;
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #1e293b;
+            border-radius: 3px;
+            border: 1px solid #334155;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -86,13 +130,30 @@
         <div class="text-center mb-8">
             <h2 class="text-3xl font-bold text-white">Find Nearby Pharmacies</h2>
             <p class="text-slate-400">
-                Click the button to find pharmacies within 15km of your location.
+                Click the button to find pharmacies within your selected radius.
             </p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             <div class="space-y-6">
+
+                <div class="space-y-3 p-4 bg-slate-800/30 rounded-lg">
+                    <div class="flex justify-between items-center">
+                        <label for="radiusSlider" class="block text-sm font-medium text-slate-300">Search Radius:</label>
+                        <span id="radiusValue" class="text-lg font-semibold text-white">15 km</span>
+                    </div>
+                    <input 
+                        type="range" 
+                        id="radiusSlider" 
+                        min="5" 
+                        max="50" 
+                        value="15" 
+                        step="1"
+                        class="w-full"
+                    >
+                </div>
+                
                 <button id="getLocationBtn" onclick="getUserLocation()" class="w-full py-3 px-4 rounded-lg font-semibold text-white btn-primary">
                     Find Pharmacies Near Me
                 </button>
@@ -118,37 +179,38 @@
         const statusEl = document.getElementById('status');
         const resultsList = document.getElementById('results-list');
         
+        const radiusSlider = document.getElementById('radiusSlider');
+        const radiusValueEl = document.getElementById('radiusValue');
+        
+        radiusSlider.addEventListener('input', () => {
+            radiusValueEl.textContent = `${radiusSlider.value} km`;
+        });
+        
         // --- Map Initialization ---
         let map;
         let userMarkerLayer;
         let pharmacyMarkerLayer;
 
         function initMap() {
-            // 1. Create the map, centered on India
-            map = L.map('map').setView([20.59, 78.96], 5); // [lat, lon], zoom
-
-            // 2. Add a "dark mode" tile layer from CartoDB
+            map = L.map('map').setView([20.59, 78.96], 5); 
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
                 subdomains: 'abcd',
                 maxZoom: 20
             }).addTo(map);
             
-            // 3. Create layer groups to hold markers
             userMarkerLayer = L.layerGroup().addTo(map);
             pharmacyMarkerLayer = L.layerGroup().addTo(map);
         }
         
         // --- Custom Icons ---
-        // Blue icon for the user
         const userIcon = L.icon({
-            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1NjNlYiIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNVMxMy4zOCAxMS41IDEyIDExLjV6Ii8+PC9zdmc+',
-            iconSize: [36, 36],
-            iconAnchor: [18, 36], // point of the icon which will correspond to marker's location
-            popupAnchor: [0, -36] // point from which the popup should open relative to the iconAnchor
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1NjNlYiIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi4lIDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNVMxMy4zOCAxMS41IDEyIDExLjV6Ii8+PC9zdmc+',
+            iconSize: [36, 36], 
+            iconAnchor: [18, 36], 
+            popupAnchor: [0, -36] 
         });
 
-        // Red icon for pharmacies
         const pharmacyIcon = L.icon({
             iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0VmNDQ0NCIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMSA5LjVoLTJWMTRoMnYtMi41em0wLTNoLTJWMTBoMnYxLjV6Ii8+PC9zdmc+',
             iconSize: [36, 36],
@@ -175,18 +237,14 @@
                     };
                     showStatus("Location found! Searching for nearby pharmacies...", "loading");
                     
-                    // --- Map Update ---
-                    // Zoom the map to the user's location
-                    map.setView([userLocation.lat, userLocation.lon], 14); // Zoom level 14
+                    map.setView([userLocation.lat, userLocation.lon], 14); 
                     
-                    // Clear old user marker and add a new one
                     userMarkerLayer.clearLayers();
                     L.marker([userLocation.lat, userLocation.lon], { icon: userIcon })
                         .addTo(userMarkerLayer)
                         .bindPopup('Your Location')
                         .openPopup();
                     
-                    // --- Automatically trigger the search ---
                     handleSearch();
                 },
                 (error) => {
@@ -200,8 +258,10 @@
          * Step 2: Handle main search (called by getUserLocation)
          */
         async function handleSearch() {
-            resultsList.innerHTML = ""; // Clear old results
-            pharmacyMarkerLayer.clearLayers(); // Clear old pharmacy pins
+            resultsList.innerHTML = ""; 
+            pharmacyMarkerLayer.clearLayers(); 
+
+            const selectedRadius = parseFloat(radiusSlider.value);
 
             try {
                 const response = await fetch(API_URL, {
@@ -209,7 +269,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         user_lat: userLocation.lat,
-                        user_lon: userLocation.lon
+                        user_lon: userLocation.lon,
+                        radius: selectedRadius 
                     })
                 });
 
@@ -218,28 +279,29 @@
                     throw new Error(err.error || `HTTP error! status: ${response.status}`);
                 }
                 const pharmacies = await response.json();
-                displayResults(pharmacies);
+                
+                displayResults(pharmacies, selectedRadius);
 
-            } catch (error) {
+            } catch (error)
+ {
                 showStatus(`Error: ${error.message}`, "error");
             } finally {
-                getLocationBtn.disabled = false; // Re-enable the button
+                getLocationBtn.disabled = false; 
             }
         }
 
         /**
          * Step 3: Display results in list AND on map
          */
-        function displayResults(pharmacies) {
+        function displayResults(pharmacies, radius) {
             if (pharmacies.length === 0) {
-                showStatus(`No pharmacies found within 15km.`, "loading");
+                showStatus(`No pharmacies found within ${radius}km.`, "loading");
                 return;
             }
             
             showStatus(`Showing ${pharmacies.length} closest pharmacies:`, "success");
             
             for (const pharmacy of pharmacies) {
-                // --- A. Add to the list on the left ---
                 const linkBox = document.createElement('a');
                 linkBox.href = pharmacy.google_map_link;
                 linkBox.target = "_blank";
@@ -255,7 +317,6 @@
                 `;
                 resultsList.appendChild(linkBox);
                 
-                // --- B. Add a marker to the map ---
                 L.marker([pharmacy.latitude, pharmacy.longitude], { icon: pharmacyIcon })
                     .addTo(pharmacyMarkerLayer)
                     .bindPopup(`<strong>${pharmacy.name}</strong><br>${pharmacy.distance_km.toFixed(2)} km away`);
@@ -267,7 +328,7 @@
          */
         function showStatus(message, type) {
             statusEl.textContent = message;
-            statusEl.className = 'p-4 rounded-lg text-center font-medium'; // Reset classes
+            statusEl.className = 'p-4 rounded-lg text-center font-medium'; 
             
             if (type === 'loading') {
                 statusEl.classList.add('bg-blue-900/50', 'text-blue-200');
@@ -299,6 +360,7 @@
             function createParticles() { particles = []; for (let i = 0; i < properties.particleCount; i++) { particles.push(new Particle()); } }
             function drawParticles() { ctx.clearRect(0, 0, w, h); for (let particle of particles) { particle.position(); particle.draw(); } }
             function drawLines() {
+                /* --- JAVASCRIPT FIX: Removed extra 'i <' --- */
                 for (let i = 0; i < particles.length; i++) {
                     for (let j = i + 1; j < particles.length; j++) {
                         let dist = Math.hypot(particles[i].x - particles[j].x, particles[i].y - particles[j].y);

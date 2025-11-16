@@ -23,7 +23,8 @@ CORS(app)
 # --- Load Pharmacy Data into Memory ---
 pharmacy_data = []
 CSV_FILENAME = 'enriched_pharmacies_corrected.csv'
-SEARCH_RADIUS_KM = 15  # <-- Set proximity to 15km
+# --- UPDATED: This is now just a default fallback ---
+SEARCH_RADIUS_KM = 15  
 try:
     with open(CSV_FILENAME, mode='r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
@@ -53,16 +54,19 @@ def find_pharmacies():
     
     try:
         data = request.json
-        # --- UPDATED: We no longer get 'pincode' ---
         user_lat = float(data.get('user_lat'))
         user_lon = float(data.get('user_lon'))
+        # --- UPDATED: Get radius from request, use default if not provided ---
+        search_radius = float(data.get('radius', SEARCH_RADIUS_KM))
+        
     except Exception as e:
         print(f"Error parsing request: {e}")
         return jsonify({"error": f"Invalid request: {e}"}), 400
 
     
     print(f"\n--- NEW SEARCH ---")
-    print(f"Searching for pharmacies within {SEARCH_RADIUS_KM}km of ({user_lat}, {user_lon})")
+    # --- UPDATED: Use dynamic search_radius in log ---
+    print(f"Searching for pharmacies within {search_radius}km of ({user_lat}, {user_lon})")
     
     pharmacies_with_distance = []
     
@@ -79,7 +83,8 @@ def find_pharmacies():
             )
             
             # 3. If within radius, add it to the list
-            if dist <= SEARCH_RADIUS_KM:
+            # --- UPDATED: Use dynamic search_radius in logic ---
+            if dist <= search_radius:
                 pharmacies_with_distance.append({
                     'name': pharmacy.get('Name', 'N/A'),
                     'address': pharmacy.get('Address', ''),
@@ -93,7 +98,8 @@ def find_pharmacies():
             
     
     if not pharmacies_with_distance:
-        print(f"--- RESULT: No pharmacies found within {SEARCH_RADIUS_KM}km. ---")
+        # --- UPDATED: Use dynamic search_radius in log ---
+        print(f"--- RESULT: No pharmacies found within {search_radius}km. ---")
         return jsonify([])
 
     
