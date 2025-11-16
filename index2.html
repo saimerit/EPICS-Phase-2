@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearby Pharmacy Finder</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+     
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1a2e;
+            color: #cbd5e1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        #background-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+        }
+
+        .widget-box {
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease-in-out;
+        }
+        .widget-box:hover {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-primary {
+            background-color: #2563eb; transition: background-color 0.2s ease;
+        }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-primary:disabled { background-color: #374151; cursor: not-allowed; opacity: 0.7; }
+        
+        /* --- Map Styles --- */
+        #map {
+            height: 100%;
+            min-height: 400px; /* For mobile */
+            width: 100%;
+            border-radius: 0.75rem; /* rounded-xl */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10; /* Ensure map is clickable */
+        }
+        /* Fix for Leaflet tiles appearing broken */
+        .leaflet-container {
+            background-color: #0d1a2e;
+        }
+        /* Custom map popup styles */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background-color: #1e293b; /* bg-slate-800 */
+            color: #e2e8f0; /* text-slate-200 */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+        }
+        .leaflet-popup-content {
+            font-weight: 500;
+        }
+        .leaflet-popup-close-button {
+            color: #e2e8f0 !important;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <canvas id="background-canvas"></canvas>
+
+    <div class="relative z-10 max-w-7xl mx-auto space-y-6">
+        
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-bold text-white">Find Nearby Pharmacies</h2>
+            <p class="text-slate-400">
+                Click the button to find pharmacies within 15km of your location.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div class="space-y-6">
+                <button id="getLocationBtn" onclick="getUserLocation()" class="w-full py-3 px-4 rounded-lg font-semibold text-white btn-primary">
+                    Find Pharmacies Near Me
+                </button>
+
+                <div id="status" class="p-4 rounded-lg text-center font-medium hidden"></div>
+                
+                <div id="results-list" class="space-y-4 max-h-[600px] overflow-y-auto">
+                    </div>
+            </div>
+            
+            <div class="w-full h-full">
+                <div id="map"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000/api/find-pharmacies';
+        let userLocation = null;
+
+        const getLocationBtn = document.getElementById('getLocationBtn');
+        const statusEl = document.getElementById('status');
+        const resultsList = document.getElementById('results-list');
+        
+        // --- Map Initialization ---
+        let map;
+        let userMarkerLayer;
+        let pharmacyMarkerLayer;
+
+        function initMap() {
+            // 1. Create the map, centered on India
+            map = L.map('map').setView([20.59, 78.96], 5); // [lat, lon], zoom
+
+            // 2. Add a "dark mode" tile layer from CartoDB
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+            
+            // 3. Create layer groups to hold markers
+            userMarkerLayer = L.layerGroup().addTo(map);
+            pharmacyMarkerLayer = L.layerGroup().addTo(map);
+        }
+        
+        // --- Custom Icons ---
+        // Blue icon for the user
+        const userIcon = L.icon({
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1NjNlYiIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNVMxMy4zOCAxMS41IDEyIDExLjV6Ii8+PC9zdmc+',
+            iconSize: [36, 36],
+            iconAnchor: [18, 36], // point of the icon which will correspond to marker's location
+            popupAnchor: [0, -36] // point from which the popup should open relative to the iconAnchor
+        });
+
+        // Red icon for pharmacies
+        const pharmacyIcon = L.icon({
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0VmNDQ0NCIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMSA5LjVoLTJWMTRoMnYtMi41em0wLTNoLTJWMTBoMnYxLjV6Ii8+PC9zdmc+',
+            iconSize: [36, 36],
+            iconAnchor: [18, 36],
+            popupAnchor: [0, -36]
+        });
+
+        /**
+         * Step 1: Get user's location, zoom map, and trigger search
+         */
+        function getUserLocation() {
+            if (!navigator.geolocation) {
+                showStatus("Geolocation is not supported by your browser.", "error");
+                return;
+            }
+            showStatus("Finding your location...", "loading");
+            getLocationBtn.disabled = true;
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    userLocation = {
+                        lat: position.coords.latitude,
+                        lon: position.coords.longitude
+                    };
+                    showStatus("Location found! Searching for nearby pharmacies...", "loading");
+                    
+                    // --- Map Update ---
+                    // Zoom the map to the user's location
+                    map.setView([userLocation.lat, userLocation.lon], 14); // Zoom level 14
+                    
+                    // Clear old user marker and add a new one
+                    userMarkerLayer.clearLayers();
+                    L.marker([userLocation.lat, userLocation.lon], { icon: userIcon })
+                        .addTo(userMarkerLayer)
+                        .bindPopup('Your Location')
+                        .openPopup();
+                    
+                    // --- Automatically trigger the search ---
+                    handleSearch();
+                },
+                (error) => {
+                    showStatus(`Error getting location: ${error.message}`, "error");
+                    getLocationBtn.disabled = false;
+                }
+            );
+        }
+
+        /**
+         * Step 2: Handle main search (called by getUserLocation)
+         */
+        async function handleSearch() {
+            resultsList.innerHTML = ""; // Clear old results
+            pharmacyMarkerLayer.clearLayers(); // Clear old pharmacy pins
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_lat: userLocation.lat,
+                        user_lon: userLocation.lon
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || `HTTP error! status: ${response.status}`);
+                }
+                const pharmacies = await response.json();
+                displayResults(pharmacies);
+
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, "error");
+            } finally {
+                getLocationBtn.disabled = false; // Re-enable the button
+            }
+        }
+
+        /**
+         * Step 3: Display results in list AND on map
+         */
+        function displayResults(pharmacies) {
+            if (pharmacies.length === 0) {
+                showStatus(`No pharmacies found within 15km.`, "loading");
+                return;
+            }
+            
+            showStatus(`Showing ${pharmacies.length} closest pharmacies:`, "success");
+            
+            for (const pharmacy of pharmacies) {
+                // --- A. Add to the list on the left ---
+                const linkBox = document.createElement('a');
+                linkBox.href = pharmacy.google_map_link;
+                linkBox.target = "_blank";
+                linkBox.className = "block p-5 rounded-lg widget-box";
+                linkBox.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <strong class="text-xl text-white">${pharmacy.name}</strong>
+                        <span class="text-sm font-semibold text-green-400">
+                            ${pharmacy.distance_km.toFixed(2)} km away
+                        </span>
+                    </div>
+                    <small class="text-slate-400">${pharmacy.address}</small>
+                `;
+                resultsList.appendChild(linkBox);
+                
+                // --- B. Add a marker to the map ---
+                L.marker([pharmacy.latitude, pharmacy.longitude], { icon: pharmacyIcon })
+                    .addTo(pharmacyMarkerLayer)
+                    .bindPopup(`<strong>${pharmacy.name}</strong><br>${pharmacy.distance_km.toFixed(2)} km away`);
+            }
+        }
+        
+        /**
+         * Helper to show status messages
+         */
+        function showStatus(message, type) {
+            statusEl.textContent = message;
+            statusEl.className = 'p-4 rounded-lg text-center font-medium'; // Reset classes
+            
+            if (type === 'loading') {
+                statusEl.classList.add('bg-blue-900/50', 'text-blue-200');
+            } else if (type === 'success') {
+                statusEl.classList.add('bg-green-900/50', 'text-green-200');
+            } else if (type === 'error') {
+                statusEl.classList.add('bg-red-900/50', 'text-red-200');
+            }
+        }
+
+        // --- Plexus Animation Code ---
+        function initPlexusAnimation() {
+            const canvas = document.getElementById('background-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let w = canvas.width = window.innerWidth;
+            let h = canvas.height = window.innerHeight;
+            let particles = [];
+            const properties = {
+                particleColor: 'rgba(255, 255, 255, 0.15)', particleCount: 50, particleSpeed: 0.3, lineLength: 150, particleRadius: 2
+            };
+            function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+            window.addEventListener('resize', resize);
+            class Particle {
+                constructor() { this.x = Math.random() * w; this.y = Math.random() * h; this.vx = Math.random() * (properties.particleSpeed * 2) - properties.particleSpeed; this.vy = Math.random() * (properties.particleSpeed * 2) - properties.particleSpeed; }
+                position() { if (this.x > w || this.x < 0) this.vx = -this.vx; if (this.y > h || this.y < 0) this.vy = -this.vy; this.x += this.vx; this.y += this.vy; }
+                draw() { ctx.beginPath(); ctx.fillStyle = properties.particleColor; ctx.arc(this.x, this.y, properties.particleRadius, 0, Math.PI * 2); ctx.fill(); }
+            }
+            function createParticles() { particles = []; for (let i = 0; i < properties.particleCount; i++) { particles.push(new Particle()); } }
+            function drawParticles() { ctx.clearRect(0, 0, w, h); for (let particle of particles) { particle.position(); particle.draw(); } }
+            function drawLines() {
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        let dist = Math.hypot(particles[i].x - particles[j].x, particles[i].y - particles[j].y);
+                        if (dist < properties.lineLength) { let opacity = 1 - (dist / properties.lineLength); ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.1})`; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.stroke(); }
+                    }
+                }
+            }
+            function loop() { drawParticles(); drawLines(); requestAnimationFrame(loop); }
+            createParticles(); loop();
+        }
+
+        // --- Start everything ---
+        initMap(); // Initialize the map on page load
+        initPlexusAnimation(); // Start the background
+    </script>
+</body>
+</html>
