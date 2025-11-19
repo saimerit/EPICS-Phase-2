@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nearby Pharmacy Finder</title>
+    <title>Nearby Amenity Finder</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -42,6 +42,21 @@
             background: rgba(30, 41, 59, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        
+        .tab-btn {
+            padding: 0.75rem 1.25rem;
+            font-weight: 600;
+            color: #94a3b8; 
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            color: #cbd5e1; 
+        }
+        .tab-btn.active {
+            color: #2563eb; 
+            border-bottom-color: #2563eb;
+        }
 
         .btn-primary {
             background-color: #2563eb; transition: background-color 0.2s ease;
@@ -49,34 +64,52 @@
         .btn-primary:hover { background-color: #1d4ed8; }
         .btn-primary:disabled { background-color: #374151; cursor: not-allowed; opacity: 0.7; }
         
+        /* --- Loading Spinner --- */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 1rem;
+            height: 1rem;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         /* --- Map Styles --- */
         #map {
-            height: 100%;
-            min-height: 400px; /* For mobile */
+            min-height: 650px; 
             width: 100%;
-            border-radius: 0.75rem; /* rounded-xl */
+            border-radius: 0.75rem; 
             border: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 10; /* Ensure map is clickable */
+            z-index: 10; 
         }
         .leaflet-container {
             background-color: #0d1a2e;
         }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-            background-color: #1e293b; /* bg-slate-800 */
-            color: #e2e8f0; /* text-slate-200 */
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
-        }
-        .leaflet-popup-content {
-            font-weight: 500;
-        }
-        .leaflet-popup-close-button {
-            color: #e2e8f0 !important;
-        }
 
-        /* --- Custom Slider Styles --- */
+        /* --- SCROLLBAR FIX: Hide the scrollbar for the results list --- */
+        #results-list::-webkit-scrollbar {
+            display: none; 
+        }
+        #results-list {
+            -ms-overflow-style: none;  
+            scrollbar-width: none;  
+        }
+        
+        /* --- Marker Highlighting Styles (NEW) --- */
+        .highlight-marker {
+            transform: scale(1.3); 
+            /* This filter shifts colors towards green/lime for high contrast */
+            filter: hue-rotate(100deg) brightness(1.5) saturate(1.5); 
+            transition: transform 0.3s, filter 0.3s;
+        }
+        /* --- Custom Slider Styles (Unchanged) --- */
         input[type=range] {
-            /* --- CSS FIX: Added 'appearance' --- */
             appearance: none; 
             -webkit-appearance: none;
             width: 100%;
@@ -85,7 +118,6 @@
         input[type=range]:focus {
             outline: none;
         }
-        /* Thumb */
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
             height: 20px;
@@ -93,7 +125,7 @@
             border-radius: 50%;
             background: #2563eb;
             cursor: pointer;
-            margin-top: -7px; /* Center thumb on track */
+            margin-top: -7px; 
         }
         input[type=range]::-moz-range-thumb {
             height: 20px;
@@ -102,7 +134,6 @@
             background: #2563eb;
             cursor: pointer;
         }
-        /* Track */
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
             height: 6px;
@@ -119,52 +150,144 @@
             border-radius: 3px;
             border: 1px solid #334155;
         }
+        .toggle-switch input[type="checkbox"] {
+            display: none;
+        }
+        .toggle-switch label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .toggle-track {
+            width: 70px;
+            height: 32px;
+            background: #4b5563; 
+            border-radius: 16px;
+            position: relative;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4px;
+        }
+        .toggle-thumb {
+            width: 24px;
+            height: 24px;
+            background: #e5e7eb; 
+            border-radius: 50%;
+            position: absolute;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .toggle-switch input:checked + label .toggle-track {
+            background: #34d399; 
+        }
+        .toggle-switch input:checked + label .toggle-thumb {
+            transform: translateX(38px); 
+            background: #059669; 
+        }
+        .toggle-text {
+            font-weight: 600;
+            color: #d1d5db; 
+            transition: color 0.2s;
+            width: 100px; 
+            text-align: right;
+            margin-right: 12px;
+        }
+        .online-text { color: #f87171; }
+        .toggle-switch input:checked + label .online-text { color: #d1d5db; }
+        .toggle-switch input:checked + label .offline-text { color: #10b981; }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
     <canvas id="background-canvas"></canvas>
 
-    <div class="relative z-10 max-w-7xl mx-auto space-y-6">
+    <div class="text-center mb-4">
+        <h2 class="text-2xl font-bold text-white">Find Nearby Amenities (Powered by OpenStreetMap)</h2>
+        <p class="text-slate-400">
+            Use the tabs below to switch between Pharmacy and Hospital search modes.
+        </p>
+    </div>
+
+    <div class="relative z-10 mx-auto">
         
-        <div class="text-center mb-8">
-            <h2 class="text-3xl font-bold text-white">Find Nearby Pharmacies</h2>
-            <p class="text-slate-400">
-                Click the button to find pharmacies within your selected radius.
-            </p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
             
-            <div class="space-y-6">
-
-                <div class="space-y-3 p-4 bg-slate-800/30 rounded-lg">
-                    <div class="flex justify-between items-center">
-                        <label for="radiusSlider" class="block text-sm font-medium text-slate-300">Search Radius:</label>
-                        <span id="radiusValue" class="text-lg font-semibold text-white">15 km</span>
+            <div class="space-y-6 lg:col-span-1">
+                
+                <div id="common-input-widget" class="p-5 rounded-xl widget-box space-y-4">
+                    
+                    <div class="flex border-b border-slate-700/50 -mt-2 -mx-2 mb-4">
+                        <button id="tabPharmacy" class="tab-btn active" onclick="switchTab('pharmacy')">
+                            💊 Pharmacies
+                        </button>
+                        <button id="tabHospital" class="tab-btn" onclick="switchTab('hospital')">
+                            🏥 Hospitals
+                        </button>
                     </div>
-                    <input 
-                        type="range" 
-                        id="radiusSlider" 
-                        min="5" 
-                        max="50" 
-                        value="15" 
-                        step="1"
-                        class="w-full"
-                    >
+
+                    <div class="space-y-2">
+                        <label for="mapLayerSelect" class="block text-sm font-medium text-slate-300">Map Style:</label>
+                        <select id="mapLayerSelect" onchange="changeMapLayer(this.value)"
+                                class="w-full p-3 rounded-lg bg-slate-700/50 border border-slate-600 focus:ring-blue-500 focus:border-blue-500 text-white">
+                            <option value="dark">Dark Mode</option>
+                            <option value="street">Standard Streets</option>
+                            <option value="satellite">Satellite (Imagery)</option>
+                            <option value="light">Light Mode</option>
+                        </select>
+                    </div>
+
+                    <div id="tabContent">
+                        <div class="space-y-2">
+                            <label for="locationInput" class="block text-sm font-medium text-slate-300">City, District, or Pincode:</label>
+                            <input 
+                                type="text" 
+                                id="locationInput" 
+                                placeholder="e.g., Hyderabad or 500001"
+                                class="w-full p-3 rounded-lg bg-slate-700/50 border border-slate-600 focus:ring-blue-500 focus:border-blue-500 text-white"
+                            >
+                            <button id="searchCityBtn" onclick="handleCitySearch()" class="w-full py-2 px-4 rounded-lg font-semibold text-white btn-primary">
+                                Search Pharmacies
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3 pt-4 border-t border-slate-700/50">
+                        <div class="flex justify-between items-center">
+                            <label for="radiusSlider" class="block text-sm font-medium text-slate-300">Search Radius:</label>
+                            <span id="radiusValue" class="text-lg font-semibold text-white">15 km</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            id="radiusSlider" 
+                            min="5" 
+                            max="50" 
+                            value="15" 
+                            step="1"
+                            class="w-full"
+                        >
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-700/50">
+                        <button id="getLocationBtn" onclick="getUserLocation()" class="w-full py-3 px-4 rounded-lg font-semibold text-white btn-primary">
+                            Use My Current Location
+                        </button>
+                    </div>
                 </div>
-                
-                <button id="getLocationBtn" onclick="getUserLocation()" class="w-full py-3 px-4 rounded-lg font-semibold text-white btn-primary">
-                    Find Pharmacies Near Me
-                </button>
 
-                <div id="status" class="p-4 rounded-lg text-center font-medium hidden"></div>
-                
-                <div id="results-list" class="space-y-4 max-h-[600px] overflow-y-auto">
+
+                <div id="results-widget" class="p-5 rounded-xl widget-box space-y-4">
+                    <h3 class="text-lg font-semibold text-white border-b border-slate-700/50 pb-2">Search Results</h3>
+                    <div id="status" class="p-2 rounded-lg text-center font-medium"> 
+                        <p class="text-center text-slate-400">Search results will appear here.</p>
                     </div>
+                    <div id="results-list" class="space-y-4 max-h-[400px] overflow-y-auto">
+                    </div>
+                </div>
             </div>
             
-            <div class="w-full h-full">
+            <div class="w-full h-full lg:col-span-3">
                 <div id="map"></div>
             </div>
 
@@ -172,10 +295,57 @@
     </div>
 
     <script>
-        const API_URL = 'http://127.0.0.1:5000/api/find-pharmacies';
-        let userLocation = null;
+        const API_URL = 'http://127.0.0.1:5000/api/find-amenities';
+        const GEOCODE_URL = 'http://127.0.0.1:5000/api/geocode';
+        
+        // --- GLOBAL STATE ---
+        let activeAmenityType = 'pharmacy'; 
+        let lastKnownLocation = null; 
+        let currentTileLayer; 
+        
+        let highlightedMarker = null;
+        let highlightTimeout = null;
+        const HIGHLIGHT_DURATION_MS = 120000; 
 
+        let markerMap = {}; 
+        let map; 
+        let userMarkerLayer; 
+        let pharmacyMarkerLayer; 
+
+
+        // --- Map Layers Configuration (Unchanged) ---
+        const MAP_LAYERS = {
+            dark: {
+                url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+                maxZoom: 20
+            },
+            light: {
+                url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+                maxZoom: 20
+            },
+            street: {
+                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            },
+            satellite: {
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                maxZoom: 18
+            }
+        };
+
+        // --- Control Elements (Unchanged) ---
         const getLocationBtn = document.getElementById('getLocationBtn');
+        
+        const locationInput = document.getElementById('locationInput');
+        const searchCityBtn = document.getElementById('searchCityBtn');
+        
+        const tabPharmacy = document.getElementById('tabPharmacy');
+        const tabHospital = document.getElementById('tabHospital');
+        
         const statusEl = document.getElementById('status');
         const resultsList = document.getElementById('results-list');
         
@@ -186,91 +356,246 @@
             radiusValueEl.textContent = `${radiusSlider.value} km`;
         });
         
-        // --- Map Initialization ---
-        let map;
-        let userMarkerLayer;
-        let pharmacyMarkerLayer;
+        // --- Initialization ---
+        switchTab('pharmacy'); 
 
+        // --- Map Layer Switching Function (Unchanged) ---
+        function changeMapLayer(layerKey) {
+            if (currentTileLayer) {
+                map.removeLayer(currentTileLayer);
+            }
+            const layer = MAP_LAYERS[layerKey];
+            currentTileLayer = L.tileLayer(layer.url, {
+                attribution: layer.attribution,
+                subdomains: 'abcd',
+                maxZoom: layer.maxZoom
+            }).addTo(map);
+        }
+
+        // --- Tab Switching Logic (Unchanged) ---
+        function switchTab(type) {
+            activeAmenityType = type;
+            lastKnownLocation = null; 
+
+            tabPharmacy.classList.remove('active');
+            tabHospital.classList.remove('active');
+            document.getElementById(`tab${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
+
+            locationInput.placeholder = type === 'pharmacy' ? 'e.g., Hyderabad or 500001' : 'e.g., Mumbai or 400001';
+            searchCityBtn.textContent = `Search ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+
+            searchCityBtn.onclick = () => handleCitySearch();
+            
+            resultsList.innerHTML = '';
+            showStatus(`Select a location or use Geolocation to find nearby ${type}.`, 'initial', -1, type);
+            
+            if (pharmacyMarkerLayer) {
+                pharmacyMarkerLayer.clearLayers();
+            }
+            clearHighlight();
+            markerMap = {};
+        }
+        
+        // --- Map Initialization (FIXED) ---
         function initMap() {
             map = L.map('map').setView([20.59, 78.96], 5); 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-                subdomains: 'abcd',
-                maxZoom: 20
-            }).addTo(map);
+            changeMapLayer('dark'); 
             
             userMarkerLayer = L.layerGroup().addTo(map);
             pharmacyMarkerLayer = L.layerGroup().addTo(map);
         }
         
-        // --- Custom Icons ---
+        // --- Custom Icons (FIXED SVG PATHS) ---
         const userIcon = L.icon({
-            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1NjNlYiIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi4lIDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNVMxMy4zOCAxMS41IDEyIDExLjV6Ii8+PC9zdmc+',
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1NjNlYiIgd2lkdGg9IjM2cHgi IGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNVMxMy4zOCAxMS41IDEyIDExLjV6Ii8+PC9zdmc+',
             iconSize: [36, 36], 
             iconAnchor: [18, 36], 
             popupAnchor: [0, -36] 
         });
 
+        // FIX: Restored correct pharmacy icon SVG path (Red: #Ef4444)
         const pharmacyIcon = L.icon({
-            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0VmNDQ0NCIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMSA5LjVoLTJWMTRoMnYtMi41em0wLTNoLTJWMTBoMnYxLjV6Ii8+PC9zdmc+',
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0VmNDQ0NCIgd2lkdGg9IjM2cHgi IGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMSA5LjVoLTJWMTRoMnYtMi41em0wLTNoLTJWMTBoMnYxLjV6Ii8+PC9zdmc+',
             iconSize: [36, 36],
             iconAnchor: [18, 36],
             popupAnchor: [0, -36]
         });
 
-        /**
-         * Step 1: Get user's location, zoom map, and trigger search
-         */
+        // FIX: Restored correct hospital icon SVG path (Blue: #13b8da)
+        const hospitalIcon = L.icon({
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5uY3BmLzIwMDAvc3ZtIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiMxM2I4ZGEiIHdpZHRoPSIzNnB4IiBoZWlnaHQ9IjM2cHgiPjxwYXRoIGQ9Ik0xOSAyaC00LjE4QzE0LjQ3LjgzIDEzLjI2IDAgMTIgMFM5LjUzLjgzIDkuMTggMkg1Y20wIDEuMS45IDIgMiAiaDE0YzEuMSAwIDItLjkgMi0yVjRjMC0xLjEtLjktMi0yLTJ6bS03IDBjLjU1IDAgMSAuNDUgMSAxcy0wLjQ1IDEtMSAxLnMxLS40NSAxLTFzLTEtMS0xLTF6bS0xIDVoLTJ2Mmg2di0ySDExdi00SDl2NHoiLz48L3N2Z3M+',
+            iconSize: [36, 36],
+            iconAnchor: [18, 36],
+            popupAnchor: [0, -36]
+        });
+
+        // ==========================================================
+        // --- HIGHLIGHTING LOGIC (Unchanged) ---
+        // ==========================================================
+        
+        function clearHighlight() {
+            if (highlightedMarker) {
+                const iconElement = highlightedMarker.getElement();
+                if (iconElement) {
+                     iconElement.classList.remove('highlight-marker');
+                }
+                highlightedMarker = null;
+            }
+            if (highlightTimeout) {
+                clearTimeout(highlightTimeout);
+                highlightTimeout = null;
+            }
+        }
+
+        function locateMarker(lat, lon, name, id) {
+            clearHighlight();
+            
+            const marker = markerMap[id];
+            
+            if (marker) {
+                highlightedMarker = marker;
+                
+                // FIX: Removed map.setView to prevent zooming and centering.
+                // map.setView([lat, lon], 17); 
+                
+                const iconElement = marker.getElement();
+                if (iconElement) {
+                    iconElement.classList.add('highlight-marker');
+                }
+                
+                marker.openPopup();
+                
+                highlightTimeout = setTimeout(function() {
+                    clearHighlight();
+                }, HIGHLIGHT_DURATION_MS);
+
+            } else {
+                console.error("Marker not found in map for ID:", id);
+                // Minimal map operation in fallback
+                L.popup({ autoClose: true, closeOnClick: true, offset: [0, -36] })
+                    .setLatLng([lat, lon])
+                    .setContent(`<strong>${name}</strong><br>Location Highlighted.`)
+                    .openOn(map);
+            }
+        }
+
+
+        // ==========================================================
+        // --- Search Flow Functions ---
+        // ==========================================================
+
+        async function handleCitySearch() {
+            const amenityType = activeAmenityType;
+            const searchTerm = locationInput.value.trim();
+            
+            if (searchTerm.length < 3) {
+                showStatus(`Please enter a city, district, or pincode for ${amenityType}.`, "error");
+                return;
+            }
+            
+            disableControls(true);
+            lastKnownLocation = null; 
+
+            const isPincode = /^\d{6}$/.test(searchTerm);
+            const searchType = isPincode ? 'Pincode' : 'City/District';
+            
+            showStatus(`Searching for ${searchType} coordinates for "${searchTerm}"...`, "loading", -1, amenityType);
+
+            try {
+                const response = await fetch(GEOCODE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        search_term: searchTerm,
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                const coords = await response.json();
+                
+                showStatus(`Location found: ${coords.display_name}. Searching for ${amenityType}...`, "loading", -1, amenityType);
+                
+                userMarkerLayer.clearLayers();
+                L.marker([coords.latitude, coords.longitude], { icon: userIcon })
+                    .addTo(userMarkerLayer)
+                    .bindPopup(`Search Center: ${coords.display_name}`)
+                    .openPopup();
+
+                handleAmenitySearch(coords.latitude, coords.longitude, amenityType);
+
+            } catch (error) {
+                showStatus(`${error.message}`, "error");
+                disableControls(false); 
+                searchCityBtn.onclick = () => handleCitySearch();
+            }
+        }
+
         function getUserLocation() {
             if (!navigator.geolocation) {
                 showStatus("Geolocation is not supported by your browser.", "error");
                 return;
             }
-            showStatus("Finding your location...", "loading");
-            getLocationBtn.disabled = true;
+            showStatus(`Finding your location...`, "loading");
+            disableControls(true);
             
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    userLocation = {
-                        lat: position.coords.latitude,
-                        lon: position.coords.longitude
-                    };
-                    showStatus("Location found! Searching for nearby pharmacies...", "loading");
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
                     
-                    map.setView([userLocation.lat, userLocation.lon], 14); 
+                    lastKnownLocation = { lat, lon }; 
+
+                    showStatus(`Location found! Click 'Search Location' to find ${activeAmenityType} near you.`, "success", -1, activeAmenityType);
+
+                    map.setView([lat, lon], 14); 
                     
                     userMarkerLayer.clearLayers();
-                    L.marker([userLocation.lat, userLocation.lon], { icon: userIcon })
+                    L.marker([lat, lon], { icon: userIcon })
                         .addTo(userMarkerLayer)
                         .bindPopup('Your Location')
                         .openPopup();
                     
-                    handleSearch();
+                    disableControls(false); 
+                    
+                    searchCityBtn.textContent = `Search ${activeAmenityType.charAt(0).toUpperCase() + activeAmenityType.slice(1)} Near Me`;
+                    searchCityBtn.onclick = () => handleAmenitySearch(lat, lon, activeAmenityType);
                 },
                 (error) => {
-                    showStatus(`Error getting location: ${error.message}`, "error");
-                    getLocationBtn.disabled = false;
+                    showStatus(`Error getting location: ${error.message}. Please try city/pincode search instead.`, "error");
+                    
+                    lastKnownLocation = null;
+                    disableControls(false);
+                    searchCityBtn.textContent = `Search ${activeAmenityType.charAt(0).toUpperCase() + activeAmenityType.slice(1)}`;
+                    searchCityBtn.onclick = () => handleCitySearch(); 
                 }
             );
         }
 
-        /**
-         * Step 2: Handle main search (called by getUserLocation)
-         */
-        async function handleSearch() {
+        async function handleAmenitySearch(user_lat, user_lon, amenity_type) {
+            
+            disableControls(true); 
+
             resultsList.innerHTML = ""; 
             pharmacyMarkerLayer.clearLayers(); 
+            markerMap = {}; 
+            clearHighlight(); 
 
             const selectedRadius = parseFloat(radiusSlider.value);
+            
+            showStatus(`Searching for ${amenity_type}...`, "loading", -1, amenity_type);
 
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        user_lat: userLocation.lat,
-                        user_lon: userLocation.lon,
-                        radius: selectedRadius 
+                        user_lat: user_lat,
+                        user_lon: user_lon,
+                        radius: selectedRadius,
+                        amenity_type: amenity_type
                     })
                 });
 
@@ -278,57 +603,120 @@
                     const err = await response.json();
                     throw new Error(err.error || `HTTP error! status: ${response.status}`);
                 }
-                const pharmacies = await response.json();
+                const amenities = await response.json();
                 
-                displayResults(pharmacies, selectedRadius);
+                displayResults(amenities, user_lat, user_lon, selectedRadius, 'online', amenity_type);
 
             } catch (error)
- {
+            {
                 showStatus(`Error: ${error.message}`, "error");
             } finally {
-                getLocationBtn.disabled = false; 
+                disableControls(false); 
+                
+                if (lastKnownLocation) {
+                    searchCityBtn.textContent = `Search ${activeAmenityType.charAt(0).toUpperCase() + activeAmenityType.slice(1)} Near Me`;
+                    searchCityBtn.onclick = () => handleAmenitySearch(lastKnownLocation.lat, lastKnownLocation.lon, activeAmenityType);
+                } else {
+                    searchCityBtn.textContent = `Search ${activeAmenityType.charAt(0).toUpperCase() + activeAmenityType.slice(1)}`;
+                    searchCityBtn.onclick = () => handleCitySearch();
+                }
             }
         }
 
         /**
-         * Step 3: Display results in list AND on map
+         * Step 3: Display results in list AND on map (UPDATED with Locate button and FitBounds)
          */
-        function displayResults(pharmacies, radius) {
-            if (pharmacies.length === 0) {
-                showStatus(`No pharmacies found within ${radius}km.`, "loading");
+        function displayResults(amenities, user_lat, user_lon, radius, mode, amenity_type) {
+            
+            if (amenities.length === 0) {
+                showStatus(`No ${amenity_type} found within ${radius}km.`, "success", 0, amenity_type); 
+                resultsList.innerHTML = `<p class="text-center text-slate-400 p-4">No ${amenity_type} found within ${radius}km of the search center.</p>`;
                 return;
             }
             
-            showStatus(`Showing ${pharmacies.length} closest pharmacies:`, "success");
+            showStatus(`Found ${amenities.length} ${amenity_type}:`, "success", amenities.length, amenity_type);
             
-            for (const pharmacy of pharmacies) {
-                const linkBox = document.createElement('a');
-                linkBox.href = pharmacy.google_map_link;
-                linkBox.target = "_blank";
-                linkBox.className = "block p-5 rounded-lg widget-box";
-                linkBox.innerHTML = `
-                    <div class="flex justify-between items-center mb-1">
-                        <strong class="text-xl text-white">${pharmacy.name}</strong>
-                        <span class="text-sm font-semibold text-green-400">
-                            ${pharmacy.distance_km.toFixed(2)} km away
-                        </span>
-                    </div>
-                    <small class="text-slate-400">${pharmacy.address}</small>
-                `;
-                resultsList.appendChild(linkBox);
+            resultsList.innerHTML = ""; 
+            
+            let bounds = [];
+            
+            bounds.push([user_lat, user_lon]);
+            
+            for (let i = 0; i < amenities.length; i++) {
+                const amenity = amenities[i];
+                const markerId = `m${i}`; 
                 
-                L.marker([pharmacy.latitude, pharmacy.longitude], { icon: pharmacyIcon })
+                const icon = amenity_type === 'hospital' ? hospitalIcon : pharmacyIcon;
+                const badgeColor = amenity_type === 'hospital' ? 'text-blue-400' : 'text-green-400'; 
+
+                bounds.push([amenity.latitude, amenity.longitude]);
+
+                const safeName = amenity.name.replace(/'/g, "\\'");
+
+                const resultWrapper = document.createElement('div');
+                resultWrapper.className = "block p-4 rounded-lg widget-box hover:shadow-lg hover:shadow-blue-900/30";
+
+                resultWrapper.innerHTML = `
+                    <a href="${amenity.google_map_link}" target="_blank" class="block">
+                        <div class="flex justify-between items-center mb-1">
+                            <strong class="text-lg text-white">${amenity.name}</strong>
+                            <span class="text-xs font-semibold ${badgeColor}">
+                                ${amenity.distance_km.toFixed(2)} km away
+                            </span>
+                        </div>
+                        <small class="text-xs text-slate-400">${amenity.address}</small>
+                    </a>
+                    <button onclick="locateMarker(${amenity.latitude}, ${amenity.longitude}, '${safeName}', '${markerId}')" 
+                            class="mt-2 w-full py-1 text-sm rounded-md font-medium text-white bg-blue-700 hover:bg-blue-800 transition duration-150">
+                        Locate on Map
+                    </button>
+                `;
+                resultsList.appendChild(resultWrapper);
+                
+                const marker = L.marker([amenity.latitude, amenity.longitude], { icon: icon })
                     .addTo(pharmacyMarkerLayer)
-                    .bindPopup(`<strong>${pharmacy.name}</strong><br>${pharmacy.distance_km.toFixed(2)} km away`);
+                    .bindPopup(`<strong>${amenity.name}</strong><br>${amenity.distance_km.toFixed(2)} km away`);
+
+                markerMap[markerId] = marker; 
+                
+                marker.on('add', function(e) {
+                    e.target.getElement().id = markerId;
+                });
+            }
+
+            if (bounds.length > 1) {
+                const mapBounds = L.latLngBounds(bounds);
+                map.fitBounds(mapBounds, { padding: [55, 55] }); 
+            } else if (bounds.length === 1) {
+                map.setView([user_lat, user_lon], 14);
             }
         }
         
-        /**
-         * Helper to show status messages
-         */
-        function showStatus(message, type) {
-            statusEl.textContent = message;
-            statusEl.className = 'p-4 rounded-lg text-center font-medium'; 
+        function disableControls(state) {
+            getLocationBtn.disabled = state;
+            radiusSlider.disabled = state;
+            searchCityBtn.disabled = state;
+            locationInput.disabled = state;
+            tabPharmacy.disabled = state;
+            tabHospital.disabled = state;
+        }
+
+        function showStatus(message, type, resultCount = -1, context = null) {
+            statusEl.classList.remove('hidden');
+            
+            let spinner = type === 'loading' ? '<span class="spinner"></span>' : '';
+            
+            if (type === 'success' && resultCount !== -1) {
+                message = `Found <span class="text-green-400 font-bold">${resultCount}</span> ${context}.`;
+            } else if (type === 'loading') {
+                 message = `${spinner}${message.replace("...", "")}`;
+            } else if (type === 'initial') {
+                statusEl.classList.remove('bg-blue-900/50', 'text-blue-200', 'bg-green-900/50', 'text-green-200', 'bg-red-900/50', 'text-red-200');
+                return;
+            }
+
+            statusEl.innerHTML = message;
+            statusEl.className = 'p-2 rounded-lg text-center font-medium'; 
             
             if (type === 'loading') {
                 statusEl.classList.add('bg-blue-900/50', 'text-blue-200');
@@ -339,7 +727,7 @@
             }
         }
 
-        // --- Plexus Animation Code ---
+        // --- Plexus Animation Code (Unchanged) ---
         function initPlexusAnimation() {
             const canvas = document.getElementById('background-canvas');
             if (!canvas) return;
@@ -360,7 +748,6 @@
             function createParticles() { particles = []; for (let i = 0; i < properties.particleCount; i++) { particles.push(new Particle()); } }
             function drawParticles() { ctx.clearRect(0, 0, w, h); for (let particle of particles) { particle.position(); particle.draw(); } }
             function drawLines() {
-                /* --- JAVASCRIPT FIX: Removed extra 'i <' --- */
                 for (let i = 0; i < particles.length; i++) {
                     for (let j = i + 1; j < particles.length; j++) {
                         let dist = Math.hypot(particles[i].x - particles[j].x, particles[i].y - particles[j].y);
